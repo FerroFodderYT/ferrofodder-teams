@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Loader2, Inbox } from 'lucide-react';
+import { Plus, Loader2, Inbox, FolderPlus, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAdmin, adminCall } from '../lib/auth';
 import {
@@ -11,11 +11,13 @@ import {
   isFormat,
   isGen,
   type Archetype,
+  type Folder,
   type Format,
   type Gen,
   type Team,
 } from '../lib/types';
 import { TeamCard } from '../components/TeamCard';
+import { FolderCard } from '../components/FolderCard';
 import { AddTeamForm } from '../components/AddTeamForm';
 import { useNavigate } from '../lib/router';
 
@@ -29,32 +31,53 @@ export function TeamListPage({ gen, format, archetype }: TeamListPageProps) {
   const { isAdmin } = useAdmin();
   const navigate = useNavigate();
   const [teams, setTeams] = useState<Team[]>([]);
+  const [folders, setFolders] = useState<Folder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [showCreateFolder, setShowCreateFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [creatingFolder, setCreatingFolder] = useState(false);
 
-  const valid = isGen(gen) && isFormat(format) && isArchetype(archetype);
+  const valid =
+    isGen(gen) && isFormat(format) && isArchetype(archetype);
   const g = valid ? (gen as Gen) : 'gen9';
   const genNum = genNumberFromSlug(g);
   const fmt = valid ? (format as Format) : 'ou';
   const arch = valid ? (archetype as Archetype) : 'hyper-offense';
 
   const loadTeams = async () => {
-    if (!valid) { setError('Invalid category.'); setLoading(false); return; }
+    if (!valid) {
+      setError('Invalid category.');
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
-    const { data, error: err } = await supabase
-      .from('teams')
-      .select('*')
-      .eq('gen', genNum)
-      .eq('format', fmt)
-      .eq('archetype', arch)
-      .order('date_created', { ascending: false });
+    const [teamsRes, foldersRes] = await Promise.all([
+      supabase
+        .from('teams')
+        .select('*')
+        .eq('gen', genNum)
+        .eq('format', fmt)
+        .eq('archetype', arch)
+        .order('date_created', { ascending: false }),
+      supabase
+        .from('folders')
+        .select('*')
+        .eq('gen', genNum)
+        .eq('format', fmt)
+        .eq('archetype', arch)
+        .order('sort_order', { ascending: true })
+        .order('name', { ascending: true }),
+    ]);
     setLoading(false);
-    if (err) { setError(err.message); return; }
-    setTeams((data as Team[]) ?? []);
+    if (teamsRes.error) { setError(teamsRes.error.message); return; }
+    if (foldersRes.error) { setError(foldersRes.error.message); return; }
+    setTeams((teamsRes.data as Team[]) ?? []);
+    setFolders((foldersRes.data as Folder[]) ?? []);
   };
 
   useEffect(() => {
@@ -67,7 +90,27 @@ export function TeamListPage({ gen, format, archetype }: TeamListPageProps) {
     setDeletingId(team.id);
     const result = await adminCall({ action: 'delete', id: team.id });
     setDeletingId(null);
-    if (!result.ok) { alert('Delete failed: ' + (result.error ?? 'Unknown error')); return; }
+    if (!result.ok) {
+      alert('Delete failed: ' + (result.error ?? 'Unknown error'));
+      return;
+    }
+    loadTeams();
+  };
+
+  const handleCreateFolder = async () => {
+    if (!newFolderName.trim()) return;
+    setCreatingFolder(true);
+    const res = await adminCall({
+      action: 'createFolder',
+      gen: genNum,
+      format: fmt,
+      archetype: arch,
+      name: newFolderName.trim(),
+    });
+    setCreatingFolder(false);
+    if (!res.ok) { alert('Failed to create folder: ' + res.error); return; }
+    setNewFolderName('');
+    setShowCreateFolder(false);
     loadTeams();
   };
 
@@ -75,7 +118,10 @@ export function TeamListPage({ gen, format, archetype }: TeamListPageProps) {
     return (
       <div className="max-w-2xl mx-auto py-20 text-center animate-fade-in">
         <p className="text-ink-300">That category doesn't exist.</p>
-        <button onClick={() => navigate('/')} className="mt-4 px-4 py-2 rounded-lg text-sm font-medium text-ink-100 bg-ink-800 hover:bg-ink-750">
+        <button
+          onClick={() => navigate('/')}
+          className="mt-4 px-4 py-2 rounded-lg text-sm font-medium text-ink-100 bg-ink-800 hover:bg-ink-750"
+        >
           Back home
         </button>
       </div>
@@ -93,16 +139,28 @@ export function TeamListPage({ gen, format, archetype }: TeamListPageProps) {
             <span>/</span>
             <span>{archetypeLabel(arch)}</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-ink-100">{archetypeLabel(arch)}</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-ink-100">
+            {archetypeLabel(arch)}
+          </h1>
         </div>
+
         {isAdmin && (
-          <button
-            onClick={() => setShowAdd(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold text-ink-100 bg-ball-500 hover:bg-ball-600 transition-colors"
-          >
-            <Plus size={16} />
-            Add Team
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowCreateFolder(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-ink-200 bg-ink-800 hover:bg-ink-750 hover:text-ink-100 transition-colors"
+            >
+              <FolderPlus size={16} />
+              New Folder
+            </button>
+            <button
+              onClick={() => setShowAdd(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold text-ink-100 bg-ball-500 hover:bg-ball-600 transition-colors"
+            >
+              <Plus size={16} />
+              Add Team
+            </button>
+          </div>
         )}
       </div>
 
@@ -112,27 +170,104 @@ export function TeamListPage({ gen, format, archetype }: TeamListPageProps) {
         </div>
       ) : error ? (
         <div className="py-16 text-center text-ball-300">{error}</div>
-      ) : teams.length === 0 ? (
+      ) : teams.length === 0 && folders.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <Inbox size={36} className="text-ink-600 mb-3" />
           <p className="text-ink-400">No teams here yet.</p>
           {isAdmin && (
-            <button
-              onClick={() => setShowAdd(true)}
-              className="mt-4 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold text-ink-100 bg-ball-500 hover:bg-ball-600 transition-colors"
-            >
-              <Plus size={16} />
-              Add the first team
-            </button>
+            <div className="mt-4 flex items-center gap-2">
+              <button
+                onClick={() => setShowCreateFolder(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold text-ink-200 bg-ink-800 hover:bg-ink-750 hover:text-ink-100 transition-colors"
+              >
+                <FolderPlus size={16} />
+                New Folder
+              </button>
+              <button
+                onClick={() => setShowAdd(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold text-ink-100 bg-ball-500 hover:bg-ball-600 transition-colors"
+              >
+                <Plus size={16} />
+                Add the first team
+              </button>
+            </div>
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          {teams.map((team) => (
-            <div key={team.id} className={deletingId === team.id ? 'opacity-40' : ''}>
-              <TeamCard team={team} isAdmin={isAdmin} onDelete={handleDelete} onEdit={setEditingTeam} />
+        <div className="space-y-6">
+          {folders.length > 0 && (
+            <div className="space-y-4">
+              {folders.map((folder) => (
+                <FolderCard
+                  key={folder.id}
+                  folder={folder}
+                  teams={teams.filter((t) => t.folder_id === folder.id)}
+                  isAdmin={isAdmin}
+                  onTeamsChanged={loadTeams}
+                  onFolderChanged={loadTeams}
+                  onEditTeam={setEditingTeam}
+                />
+              ))}
             </div>
-          ))}
+          )}
+
+          {teams.some((t) => !t.folder_id) && (
+            <div>
+              {folders.length > 0 && (
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-ink-500 mb-3">Standalone teams</h2>
+              )}
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                {teams.filter((t) => !t.folder_id).map((team) => (
+                  <div key={team.id} className={deletingId === team.id ? 'opacity-40' : ''}>
+                    <TeamCard team={team} isAdmin={isAdmin} onDelete={handleDelete} onEdit={setEditingTeam} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {showCreateFolder && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
+          onClick={() => { setShowCreateFolder(false); setNewFolderName(''); }}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl border border-ink-700 bg-ink-900 shadow-2xl animate-scale-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-ink-800">
+              <div className="flex items-center gap-2.5">
+                <FolderPlus size={16} className="text-ball-400" />
+                <h2 className="text-base font-semibold text-ink-100">New Folder</h2>
+              </div>
+              <button onClick={() => { setShowCreateFolder(false); setNewFolderName(''); }} className="text-ink-400 hover:text-ink-100">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-5 flex flex-col gap-4">
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium uppercase tracking-wider text-ink-400">Folder name</span>
+                <input
+                  autoFocus
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleCreateFolder(); }}
+                  placeholder="e.g. Stall Variants"
+                  className="bg-ink-800 border border-ink-700 rounded-lg px-3 py-2.5 text-sm text-ink-100 placeholder-ink-500 focus:outline-none focus:border-ball-500"
+                />
+              </label>
+              <button
+                onClick={handleCreateFolder}
+                disabled={creatingFolder || !newFolderName.trim()}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold text-ink-100 bg-ball-500 hover:bg-ball-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {creatingFolder ? <Loader2 size={15} className="animate-spin" /> : <FolderPlus size={15} />}
+                {creatingFolder ? 'Creating…' : 'Create Folder'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -142,9 +277,13 @@ export function TeamListPage({ gen, format, archetype }: TeamListPageProps) {
           initialFormat={fmt}
           initialArchetype={arch}
           onClose={() => setShowAdd(false)}
-          onSaved={() => { setShowAdd(false); loadTeams(); }}
+          onSaved={() => {
+            setShowAdd(false);
+            loadTeams();
+          }}
         />
       )}
+
       {editingTeam && (
         <AddTeamForm
           initialGen={g}
@@ -152,7 +291,10 @@ export function TeamListPage({ gen, format, archetype }: TeamListPageProps) {
           initialArchetype={arch}
           team={editingTeam}
           onClose={() => setEditingTeam(null)}
-          onSaved={() => { setEditingTeam(null); loadTeams(); }}
+          onSaved={() => {
+            setEditingTeam(null);
+            loadTeams();
+          }}
         />
       )}
     </div>

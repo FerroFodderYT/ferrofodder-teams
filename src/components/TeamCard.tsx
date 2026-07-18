@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ExternalLink, Trash2, Pencil, Code2, X, Copy, Check } from 'lucide-react';
 import type { Team } from '../lib/types';
-import { teamDisplayName, hasCustomNickname, formatDate, spriteUrl } from '../lib/pokepaste';
+import { spriteUrl } from '../lib/pokepaste';
 
 interface TeamCardProps {
   team: Team;
@@ -10,8 +10,11 @@ interface TeamCardProps {
   onEdit: (team: Team) => void;
 }
 
-function formatDateLocal(iso: string): string {
-  return formatDate(iso);
+function formatDate(iso: string): string {
+  // iso is a date string (YYYY-MM-DD) or timestamp; render as "June 27, 2026"
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
 export function TeamCard({ team, isAdmin, onDelete, onEdit }: TeamCardProps) {
@@ -32,8 +35,8 @@ export function TeamCard({ team, isAdmin, onDelete, onEdit }: TeamCardProps) {
     <>
       <div className="group relative rounded-2xl border border-ink-800 bg-ink-850/80 p-5 shadow-glow transition-all duration-300 hover:border-ball-500/40 hover:shadow-glow-strong">
         <div className="flex items-center justify-between mb-1">
-          <h3 className="text-base font-bold text-ink-100 leading-tight">
-            {team.team_name || teamDisplayName(team.pokemon, team.date_created)}
+          <h3 className="text-base font-semibold text-ink-100 leading-tight">
+            {team.team_name}
           </h3>
           {isAdmin && (
             <div className="flex items-center gap-1">
@@ -56,8 +59,8 @@ export function TeamCard({ team, isAdmin, onDelete, onEdit }: TeamCardProps) {
             </div>
           )}
         </div>
-        <time className="block text-xs font-medium text-ink-500 mb-4">
-          {formatDateLocal(team.date_created)}
+        <time className="block text-xs font-medium uppercase tracking-wider text-ink-400 mb-4">
+          {formatDate(team.date_created)}
         </time>
 
         <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 sm:gap-3 mb-5">
@@ -116,7 +119,7 @@ export function TeamCard({ team, isAdmin, onDelete, onEdit }: TeamCardProps) {
               <div className="flex items-center gap-2">
                 <Code2 size={16} className="text-ball-400" />
                 <span className="text-sm font-semibold text-ink-100">Poképaste</span>
-                <span className="text-xs text-ink-500">{formatDateLocal(team.date_created)}</span>
+                <span className="text-xs text-ink-500">{formatDate(team.date_created)}</span>
               </div>
               <div className="flex items-center gap-1">
                 <button

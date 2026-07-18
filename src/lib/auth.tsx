@@ -1,89 +1,48 @@
-import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
-import type { Session } from '@supabase/supabase-js';
-import { supabase } from './supabase';
+import { createContext, useContext, useState, type ReactNode } from 'react';
 
-interface AdminCallResult {
-  ok: boolean;
-  data?: unknown;
-  error?: string;
-}
-
-const EDGE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/teams-admin`;
-
-export async function adminCall(payload: Record<string, unknown>): Promise<AdminCallResult> {
-  try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const token = sessionData.session?.access_token;
-    if (!token) return { ok: false, error: 'Not signed in' };
-
-    const res = await fetch(EDGE_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const json = await res.json();
-    if (!res.ok) return { ok: false, error: json.error ?? `HTTP ${res.status}` };
-    return { ok: true, data: json };
-  } catch (err) {
-    return { ok: false, error: (err as Error).message };
-  }
-}
+const SESSION_KEY = 'ff_admin';
+const SESSION_PW_KEY = 'ff_admin_pw';
 
 interface AdminContextValue {
-  session: Session | null;
   isAdmin: boolean;
-  isAal2: boolean;
-  loading: boolean;
-  signOut: () => Promise<void>;
-  refresh: () => Promise<void>;
+  verify: (password: string) => Promise<boolean>;
+  revoke: () => void;
 }
 
 const AdminContext = createContext<AdminContextValue | undefined>(undefined);
 
 export function AdminProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
-  const [isAal2, setIsAal2] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState<boolean>(() => {
+    try { return sessionStorage.getItem(SESSION_KEY) === '1'; } catch { return false; }
+  });
 
-  const refresh = useCallback(async () => {
-    const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-    setIsAal2(data.currentLevel === 'aal2');
-  }, []);
+  const verify = async (password: string): Promise<boolean> => {
+    try {
+      const res = await adminCall({ action: 'ping', password });
+      if (res.ok) {
+        setIsAdmin(true);
+        try {
+          sessionStorage.setItem(SESSION_KEY, '1');
+          // Store password in sessionStorage so subsequent writes can use it.
+          // sessionStorage is tab-scoped and not accessible cross-origin.
+          sessionStorage.setItem(SESSION_PW_KEY, password);
+        } catch { /* ignore */ }
+        return true;
+      }
+    } catch { /* network error */ }
+    return false;
+  };
 
-  useEffect(() => {
-    let active = true;
-    supabase.auth.getSession().then(async ({ data }) => {
-      if (!active) return;
-      setSession(data.session);
-      if (data.session) await refresh();
-      setLoading(false);
-    });
-
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
-      setSession(newSession);
-      if (newSession) await refresh();
-      else setIsAal2(false);
-    });
-
-    return () => {
-      active = false;
-      sub.subscription.unsubscribe();
-    };
-  }, [refresh]);
-
-  const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
-    setSession(null);
-    setIsAal2(false);
-  }, []);
+  const revoke = () => {
+    setIsAdmin(false);
+    try {
+      sessionStorage.removeItem(SESSION_KEY);
+      sessionStorage.removeItem(SESSION_PW_KEY);
+    } catch { /* ignore */ }
+  };
 
   return (
-    <AdminContext.Provider value={{ session, isAdmin: !!session, isAal2, loading, signOut, refresh }}>
+    <AdminContext.Provider value={{ isAdmin, verify, revoke }}>
       {children}
     </AdminContext.Provider>
   );
@@ -93,4 +52,40 @@ export function useAdmin() {
   const ctx = useContext(AdminContext);
   if (!ctx) throw new Error('useAdmin must be used within AdminProvider');
   return ctx;
+}
+
+// ---------------------------------------------------------------------------
+// Shared helper — calls the teams-admin edge function.
+// Automatically injects the stored admin password.
+// Returns { ok: true, data } on success, { ok: false, error } on failure.
+// ---------------------------------------------------------------------------
+export async function adminCall(
+  body: Record<string, unknown>
+): Promise<{ ok: boolean; data?: unknown; error?: string }> {
+  // Read the password from sessionStorage if not already in the payload.
+  let payload = body;
+  if (!payload.password) {
+    try {
+      const pw = sessionStorage.getItem(SESSION_PW_KEY);
+      if (pw) payload = { ...body, password: pw };
+    } catch { /* ignore */ }
+  }
+
+  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/teams-admin`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+      'Apikey': import.meta.env.VITE_SUPABASE_ANON_KEY as string,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const json = await res.json().catch(() => ({}));
+
+  if (!res.ok || json.error) {
+    return { ok: false, error: json.error ?? `HTTP ${res.status}` };
+  }
+  return { ok: true, data: json };
 }

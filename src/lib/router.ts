@@ -23,7 +23,7 @@ export function useNavigate() {
 }
 
 export interface ParsedRoute {
-  name: 'home' | 'team-list' | 'search' | 'admin-login';
+  name: 'home' | 'team-list' | 'search';
   gen?: string;
   format?: string;
   archetype?: string;
@@ -34,9 +34,6 @@ export function parseRoute(path: string): ParsedRoute {
   if (clean === '/') return { name: 'home' };
 
   const parts = clean.split('/').filter(Boolean);
-  if (parts.length === 2 && parts[0] === 'admin' && parts[1] === 'login') {
-    return { name: 'admin-login' };
-  }
   if (parts.length === 1 && parts[0] === 'search') {
     return { name: 'search' };
   }

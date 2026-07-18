@@ -1,23 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Search, Loader2, X, Filter, Calendar, Layers, Trophy, Tag } from 'lucide-react';
+import { Search, Loader2, X, Filter, Calendar, Layers, Trophy } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import {
-  ARCHETYPES,
   GENS,
   FORMAT_LABELS,
   formatsForGen,
   genLabel,
   genSlugFromNumber,
   isFormat,
-  archetypeLabel,
-  type Archetype,
   type Format,
   type Team,
 } from '../lib/types';
 import { TeamCard } from '../components/TeamCard';
-import { useAdmin, adminCall } from '../lib/auth';
+import { useAdmin } from '../lib/auth';
 import { useVisibility } from '../lib/genVisibility';
 import { useNavigate } from '../lib/router';
+import { adminCall } from '../lib/auth';
 
 const DATE_PRESETS = [
   { label: 'All time', value: 'all' as const },
@@ -34,7 +32,6 @@ export function SearchPage() {
   const [query, setQuery] = useState('');
   const [selectedGens, setSelectedGens] = useState<number[]>([]);
   const [selectedFormats, setSelectedFormats] = useState<Format[]>([]);
-  const [selectedArchetypes, setSelectedArchetypes] = useState<Archetype[]>([]);
   const [datePreset, setDatePreset] = useState<'all' | 'year' | '30d' | '7d'>('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -66,10 +63,6 @@ export function SearchPage() {
     setSelectedFormats((prev) => prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]);
   };
 
-  const toggleArchetype = (a: Archetype) => {
-    setSelectedArchetypes((prev) => prev.includes(a) ? prev.filter((x) => x !== a) : [...prev, a]);
-  };
-
   const applyPreset = (preset: typeof DATE_PRESETS[number]['value']) => {
     setDatePreset(preset);
     const now = new Date();
@@ -94,7 +87,6 @@ export function SearchPage() {
     if (gens.length > 0) q = q.in('gen', gens);
 
     if (selectedFormats.length > 0) q = q.in('format', selectedFormats);
-    if (selectedArchetypes.length > 0) q = q.in('archetype', selectedArchetypes);
 
     if (dateFrom) q = q.gte('date_created', dateFrom);
     if (dateTo) q = q.lte('date_created', dateTo);
@@ -138,29 +130,17 @@ export function SearchPage() {
   }, [results]);
 
   const clearFilters = () => {
-    setQuery(''); setSelectedGens([]); setSelectedFormats([]); setSelectedArchetypes([]);
+    setQuery(''); setSelectedGens([]); setSelectedFormats([]);
     setDatePreset('all'); setDateFrom(''); setDateTo('');
   };
 
-  const hasFilters = query || selectedGens.length || selectedFormats.length || selectedArchetypes.length || dateFrom || dateTo;
-
-  const renderGroup = (teams: Team[], genSlug: string, fmt: string) => {
-    return (
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        {teams.map((team) => (
-          <div key={team.id} className={deletingId === team.id ? 'opacity-40' : ''}>
-            <TeamCard team={team} isAdmin={isAdmin} onDelete={handleDelete} onEdit={(t) => navigate(`/${genSlug}/${t.format}/${t.archetype}`)} />
-          </div>
-        ))}
-      </div>
-    );
-  };
+  const hasFilters = query || selectedGens.length || selectedFormats.length || dateFrom || dateTo;
 
   return (
     <div className="max-w-5xl mx-auto animate-fade-in">
       <div className="mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-ink-100 tracking-tight">Search Teams</h1>
-        <p className="mt-1.5 text-sm text-ink-400">Find teams by Pokémon, name, generation, ladder, archetype, or date.</p>
+        <p className="mt-1.5 text-sm text-ink-400">Find teams by Pokémon, name, generation, ladder, or date.</p>
       </div>
 
       <div className="rounded-2xl border border-ink-800 bg-ink-850/80 p-4 sm:p-5 mb-6">
@@ -224,31 +204,6 @@ export function SearchPage() {
                     }`}
                   >
                     {FORMAT_LABELS[f]}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div>
-            <div className="flex items-center gap-1.5 mb-2">
-              <Tag size={13} className="text-ink-500" />
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-500">Archetype</span>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {ARCHETYPES.map((a) => {
-                const active = selectedArchetypes.includes(a.slug);
-                return (
-                  <button
-                    key={a.slug}
-                    onClick={() => toggleArchetype(a.slug)}
-                    className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors border ${
-                      active
-                        ? 'bg-ball-500 text-ink-950 border-ball-500'
-                        : 'bg-ink-800 text-ink-300 border-ink-700 hover:border-ink-600 hover:text-ink-100'
-                    }`}
-                  >
-                    {archetypeLabel(a.slug)}
                   </button>
                 );
               })}
@@ -338,7 +293,13 @@ export function SearchPage() {
                     <span className="text-ink-600">·</span>
                     <span className="text-sm text-ink-400">{isFormat(fmt) ? FORMAT_LABELS[fmt as Format] : fmt}</span>
                   </div>
-                  {renderGroup(teams, genSlug, fmt)}
+                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                    {teams.map((team) => (
+                      <div key={team.id} className={deletingId === team.id ? 'opacity-40' : ''}>
+                        <TeamCard team={team} isAdmin={isAdmin} onDelete={handleDelete} onEdit={(t) => navigate(`/${genSlug}/${t.format}/${t.archetype}`)} />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               );
             })}

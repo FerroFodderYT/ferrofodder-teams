@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
-import { X, Loader2, AlertCircle } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { X, Loader2, AlertCircle, FolderPlus } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 import { adminCall } from '../lib/auth';
 import {
   ARCHETYPES,
@@ -9,6 +10,7 @@ import {
   genNumberFromSlug,
   genSlugFromNumber,
   type Archetype,
+  type Folder,
   type Format,
   type Gen,
   type Team,
@@ -55,10 +57,30 @@ export function AddTeamForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [folderId, setFolderId] = useState<string | null>(team?.folder_id ?? null);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [creatingFolder, setCreatingFolder] = useState(false);
+
   const parsed = useMemo(() => parsePokepaste(pokepasteText), [pokepasteText]);
 
   const availableFormats = formatsForGen(gen);
   const genNum = genNumberFromSlug(gen);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const { data } = await supabase
+        .from('folders')
+        .select('*')
+        .eq('gen', genNum)
+        .eq('format', format)
+        .eq('archetype', archetype)
+        .order('name', { ascending: true });
+      if (active) setFolders((data as Folder[]) ?? []);
+    })();
+    return () => { active = false; };
+  }, [genNum, format, archetype]);
 
   const validCount = parsed.length >= 1 && parsed.length <= 6;
   const canSubmit = validCount && teamName.trim().length > 0 && !submitting;
@@ -83,6 +105,24 @@ export function AddTeamForm({
     }
     setSubmitting(true);
 
+    let finalFolderId = folderId;
+
+    if (newFolderName.trim()) {
+      const folderResult = await adminCall({
+        action: 'createFolder',
+        gen: genNum,
+        format,
+        archetype,
+        name: newFolderName.trim(),
+      });
+      if (!folderResult.ok) {
+        setSubmitting(false);
+        setError(folderResult.error ?? 'Failed to create folder.');
+        return;
+      }
+      finalFolderId = (folderResult.data as { id: string }).id;
+    }
+
     const payload = {
       gen: genNum,
       format,
@@ -92,6 +132,7 @@ export function AddTeamForm({
       pokepaste_text: pokepasteText,
       pokepaste_url: pokepasteUrl.trim() || null,
       pokemon: parsed,
+      folder_id: finalFolderId || null,
     };
     const result = isEditing
       ? await adminCall({ action: 'update', id: team!.id, ...payload })
@@ -181,6 +222,42 @@ export function AddTeamForm({
                 onChange={(e) => setDate(e.target.value)}
                 className="bg-ink-800 border border-ink-700 rounded-lg px-3 py-2 text-sm text-ink-100 focus:outline-none focus:border-ball-500"
               />
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium uppercase tracking-wider text-ink-400">Folder</span>
+              <select
+                value={folderId ?? ''}
+                onChange={(e) => { setFolderId(e.target.value || null); setNewFolderName(''); }}
+                className="bg-ink-800 border border-ink-700 rounded-lg px-3 py-2 text-sm text-ink-100 focus:outline-none focus:border-ball-500"
+              >
+                <option value="">No folder (standalone)</option>
+                {folders.map((f) => (
+                  <option key={f.id} value={f.id}>{f.name}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium uppercase tracking-wider text-ink-400">
+                New Folder <span className="text-ink-500 normal-case">(optional)</span>
+              </span>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newFolderName}
+                  onChange={(e) => { setNewFolderName(e.target.value); if (e.target.value) setFolderId(null); }}
+                  placeholder="Create a new folder"
+                  className="flex-1 bg-ink-800 border border-ink-700 rounded-lg px-3 py-2 text-sm text-ink-100 placeholder-ink-500 focus:outline-none focus:border-ball-500"
+                />
+                {creatingFolder ? (
+                  <Loader2 size={16} className="animate-spin text-ink-400 self-center" />
+                ) : (
+                  <FolderPlus size={16} className="text-ink-500 self-center shrink-0" />
+                )}
+              </div>
             </label>
           </div>
 

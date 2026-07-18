@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { ChevronRight, Eye, EyeOff, Loader2, Menu, Search, X, Youtube } from 'lucide-react';
-
 import {
   ARCHETYPES,
   GENS,
@@ -47,14 +46,6 @@ export function Sidebar({
   const navigate = useNavigate();
   const route = parseRoute(useRoute());
   const { isAdmin } = useAdmin();
-  const [searchInput, setSearchInput] = useState('');
-
-  const submitSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    const q = searchInput.trim();
-    navigate(q ? `/search?q=${encodeURIComponent(q)}` : '/search');
-    onCloseMobile();
-  };
   const { genVisibility, isFormatVisible, loading, toggleGenVisibility, toggleFormatVisibility } = useVisibility();
 
   const activeGen: Gen | undefined =
@@ -113,19 +104,6 @@ export function Sidebar({
 
   const content = (
     <nav className="flex flex-col gap-0.5 px-2 py-3">
-      <form onSubmit={submitSearch} className="px-1 mb-2">
-        <div className="relative">
-          <Search size={15} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-500" />
-          <input
-            type="text"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search teams…"
-            className="w-full bg-ink-850 border border-ink-700 rounded-lg pl-8 pr-3 py-2 text-sm text-ink-100 placeholder-ink-500 focus:outline-none focus:border-ball-500"
-          />
-        </div>
-      </form>
-
       <button
         onClick={() => go('/search')}
         className={`text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
@@ -135,7 +113,7 @@ export function Sidebar({
         }`}
       >
         <Search size={15} className="text-ink-400" />
-        Advanced Search
+        Search Teams
       </button>
 
       <button

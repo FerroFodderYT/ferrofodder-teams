@@ -53,7 +53,6 @@ export interface Team {
   pokemon: PokemonEntry[];
   created_at: string;
   folder_id: string | null;
-  folder: string | null;
   sort_order: number;
 }
 
