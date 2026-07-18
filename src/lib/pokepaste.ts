@@ -1,33 +1,16 @@
 import type { PokemonEntry } from './types';
 
-/**
- * Parse a pokepaste import block into the 6 Pokémon entries.
- *
- * A Pokémon block starts with a header line like:
- *   Nickname (Species) (M) @ Item
- *   Nickname (Species) @ Item
- *   Species (M) @ Item
- *   Species @ Item
- * The header may include a gender `(M)`/`(F)` and an item after `@`.
- * If a parenthesized species is present, the text before it is the nickname;
- * otherwise the species itself is the "nickname" (no custom nickname given).
- */
 export function parsePokepaste(text: string): PokemonEntry[] {
   const entries: PokemonEntry[] = [];
   const lines = text.split(/\r?\n/);
 
   for (const line of lines) {
+    if (/^\s+/.test(line)) continue;
     const trimmed = line.trim();
     if (!trimmed) continue;
-
-    // A header line is one that is NOT indented (no leading whitespace) and
-    // isn't a move/ability/nature line. Move/ability lines start with lowercase
-    // keywords or are indented. We detect headers by: starts at column 0 and
-    // does not start with a known keyword.
-    if (/^\s+/.test(line)) continue; // indented = detail line
     if (/^(Ability|Level|Shiny|Gigantamax|Happiness|EVs|IVs|Nature|Tera Type):/i.test(trimmed)) continue;
-    if (/^\w+ Nature$/i.test(trimmed)) continue; // e.g. "Adamant Nature"
-    if (/^-\s/.test(trimmed)) continue; // move line (e.g. "- Knock Off")
+    if (/^\w+ Nature$/i.test(trimmed)) continue;
+    if (/^-\s/.test(trimmed)) continue;
 
     const parsed = parseHeader(trimmed);
     if (parsed) {
@@ -40,76 +23,155 @@ export function parsePokepaste(text: string): PokemonEntry[] {
 }
 
 function parseHeader(header: string): PokemonEntry | null {
-  // Strip trailing item: "Name @ Item"
   let core = header;
   const atIndex = core.lastIndexOf(' @ ');
-  if (atIndex !== -1) {
-    core = core.slice(0, atIndex).trim();
+  if (atIndex !== -1) core = core.slice(0, atIndex).trim();
+
+  const parenMatches = [...core.matchAll(/\(([^()]*)\)/g)];
+  const speciesParen = parenMatches.find((m) => {
+    const inner = m[1].trim();
+    return inner !== 'M' && inner !== 'F';
+  });
+
+  if (speciesParen && speciesParen.index !== undefined) {
+    const species = speciesParen[1].trim();
+    const nickname = core.slice(0, speciesParen.index).trim();
+    return { nickname: nickname || species, species };
   }
 
-  // Strip trailing gender: "(M)" / "(F)"
   core = core.replace(/\s*\([MF]\)\s*$/, '').trim();
-
-  // Look for "Nickname (Species)" pattern.
-  const nickMatch = core.match(/^(.+?)\s*\(([^()]+)\)\s*$/);
-  if (nickMatch) {
-    const nickname = nickMatch[1].trim();
-    const species = nickMatch[2].trim();
-    return { nickname, species };
-  }
-
-  // No parenthesized species — the whole thing is the species, used as nickname too.
-  const species = core.trim();
+  const species = core;
   if (!species) return null;
   return { nickname: species, species };
 }
 
-// Pokémon Showdown's sprite CDN. Slugs are lowercase with hyphens stripped
-// (e.g. "Iron Hands" -> "ironhands", "Tapu Koko" -> "tapukoko"). A few names
-// need explicit overrides because Showdown's slug convention diverges from a
-// naive strip.
 const SPECIES_OVERRIDES: Record<string, string> = {
-  'mr. mime': 'mrmime',
-  'mr. rime': 'mrrime',
-  'mime jr.': 'mimejr',
-  'type: null': 'typenull',
-  'tapu koko': 'tapukoko',
-  'tapu lele': 'tapulele',
-  'tapu bulu': 'tapubulu',
-  'tapu fini': 'tapufini',
-  'porygon-z': 'porygonz',
-  'ho-oh': 'hooh',
+  'kommo-o': 'kommoo',
   'jangmo-o': 'jangmoo',
   'hakamo-o': 'hakamoo',
-  'kommo-o': 'kommoo',
-  'great tusk': 'greattusk',
-  'iron hands': 'ironhands',
-  'iron bundle': 'ironbundle',
-  'iron valiant': 'ironvaliant',
-  'roaring moon': 'roaringmoon',
-  'walking wake': 'walkingwake',
-  'gouging fire': 'gougingfire',
-  'raging bolt': 'ragingbolt',
-  'iron leaves': 'ironleaves',
-  'iron boulder': 'ironboulder',
-  'iron crown': 'ironcrown',
-  'iron moth': 'ironmoth',
-  'iron jugulis': 'ironjugulis',
-  'iron thorns': 'ironthorns',
-  'chien-pao': 'chienpao',
-  'ting-lu': 'tinglu',
-  'chi-yu': 'chiyu',
-  'wo-chien': 'wochien',
+  'iron valiant': 'iron-valiant',
+  'iron treads': 'iron-treads',
+  'iron moth': 'iron-moth',
+  'iron hands': 'iron-hands',
+  'iron bundle': 'iron-bundle',
+  'iron jugulis': 'iron-jugulis',
+  'iron thorns': 'iron-thorns',
+  'tapu lele': 'tapu-lele',
+  'tapu koko': 'tapu-koko',
+  'tapu fini': 'tapu-fini',
+  'tapu bulu': 'tapu-bulu',
+  'great tusk': 'great-tusk',
+  'roaring moon': 'roaring-moon',
+  'walking wake': 'walking-wake',
+  'gouging fire': 'gouging-fire',
+  'raging bolt': 'raging-bolt',
+  'sandy shocks': 'sandy-shocks',
+  'scream tail': 'scream-tail',
+  'flutter mane': 'flutter-mane',
+  'brute bonnet': 'brute-bonnet',
+  'slither wing': 'slither-wing',
+  'porygon-z': 'porygon-z',
+  'porygon2': 'porygon2',
+  'mr. mime': 'mr-mime',
+  'mr. rime': 'mr-rime',
+  'mime jr.': 'mime-jr',
+  'type: null': 'typenull',
+  'landorus-therian': 'landorus-therian',
+  'tornadus-therian': 'tornadus-therian',
+  'thundurus-therian': 'thundurus-therian',
+  'slowking-galar': 'slowking-galar',
+  'weezing-galar': 'weezing-galar',
+  'samurott-hisui': 'samurott-hisui',
+  'arcanine-hisui': 'arcanine-hisui',
+  'electrode-hisui': 'electrode-hisui',
+  'typhlosion-hisui': 'typhlosion-hisui',
+  'charizard-mega-x': 'charizard-mega-x',
+  'charizard-mega-y': 'charizard-mega-y',
+  'mewtwo-mega-x': 'mewtwo-mega-x',
+  'mewtwo-mega-y': 'mewtwo-mega-y',
+  'alakazam-mega': 'alakazam-mega',
+  'gengar-mega': 'gengar-mega',
+  'kangaskhan-mega': 'kangaskhan-mega',
+  'pinsir-mega': 'pinsir-mega',
+  'gyarados-mega': 'gyarados-mega',
+  'aerodactyl-mega': 'aerodactyl-mega',
+  'ampharos-mega': 'ampharos-mega',
+  'scizor-mega': 'scizor-mega',
+  'heracross-mega': 'heracross-mega',
+  'houndoom-mega': 'houndoom-mega',
+  'tyranitar-mega': 'tyranitar-mega',
+  'blaziken-mega': 'blaziken-mega',
+  'gardevoir-mega': 'gardevoir-mega',
+  'mawile-mega': 'mawile-mega',
+  'aggron-mega': 'aggron-mega',
+  'medicham-mega': 'medicham-mega',
+  'manectric-mega': 'manectric-mega',
+  'banette-mega': 'banette-mega',
+  'absol-mega': 'absol-mega',
+  'garchomp-mega': 'garchomp-mega',
+  'lucario-mega': 'lucario-mega',
+  'abomasnow-mega': 'abomasnow-mega',
+  'beedrill-mega': 'beedrill-mega',
+  'pidgeot-mega': 'pidgeot-mega',
+  'slowbro-mega': 'slowbro-mega',
+  'steelix-mega': 'steelix-mega',
+  'sceptile-mega': 'sceptile-mega',
+  'swampert-mega': 'swampert-mega',
+  'sableye-mega': 'sableye-mega',
+  'sharpedo-mega': 'sharpedo-mega',
+  'camerupt-mega': 'camerupt-mega',
+  'altaria-mega': 'altaria-mega',
+  'glalie-mega': 'glalie-mega',
+  'salamence-mega': 'salamence-mega',
+  'metagross-mega': 'metagross-mega',
+  'latias-mega': 'latias-mega',
+  'latios-mega': 'latios-mega',
+  'rayquaza-mega': 'rayquaza-mega',
+  'lopunny-mega': 'lopunny-mega',
+  'gallade-mega': 'gallade-mega',
+  'audino-mega': 'audino-mega',
+  'diancie-mega': 'diancie-mega',
 };
 
-export function spriteUrl(species: string): string {
+function slug(species: string): string {
   const key = species.toLowerCase().trim();
-  const slug =
-    SPECIES_OVERRIDES[key] ??
-    key
-      .replace(/\s+/g, '-')
-      .replace(/[^a-z0-9-]+/g, '')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '');
-  return `https://play.pokemonshowdown.com/sprites/gen5/${slug}.png`;
+  if (SPECIES_OVERRIDES[key]) return SPECIES_OVERRIDES[key];
+  return key
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]+/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+export function spriteAniUrl(species: string): string {
+  return `https://play.pokemonshowdown.com/sprites/ani/${slug(species)}.gif`;
+}
+
+export function spriteGen5Url(species: string): string {
+  return `https://play.pokemonshowdown.com/sprites/gen5/${slug(species)}.png`;
+}
+
+export const POKEBALL_PLACEHOLDER =
+  'data:image/svg+xml;utf8,' +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><circle cx="40" cy="40" r="36" fill="#9ca3af" stroke="#4b5563" stroke-width="3"/><rect x="4" y="34" width="72" height="12" fill="#4b5563"/><circle cx="40" cy="40" r="9" fill="#e5e7eb" stroke="#4b5563" stroke-width="3"/></svg>',
+  );
+
+export function teamDisplayName(entries: PokemonEntry[], dateISO: string): string {
+  const first = entries[0];
+  if (first && first.nickname && first.nickname !== first.species) {
+    return first.nickname;
+  }
+  return formatDate(dateISO);
+}
+
+export function hasCustomNickname(entries: PokemonEntry[]): boolean {
+  const first = entries[0];
+  return !!(first && first.nickname && first.nickname !== first.species);
+}
+
+export function formatDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 }

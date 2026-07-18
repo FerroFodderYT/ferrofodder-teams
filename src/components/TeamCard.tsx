@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { ExternalLink, Trash2, Pencil, Code2, X, Copy, Check } from 'lucide-react';
 import type { Team } from '../lib/types';
-import { spriteUrl } from '../lib/pokepaste';
+import { Sprite } from './Sprite';
+import { teamDisplayName, hasCustomNickname, formatDate } from '../lib/pokepaste';
 
 interface TeamCardProps {
   team: Team;
@@ -10,11 +11,8 @@ interface TeamCardProps {
   onEdit: (team: Team) => void;
 }
 
-function formatDate(iso: string): string {
-  // iso is a date string (YYYY-MM-DD) or timestamp; render as "June 27, 2026"
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+function formatDateLocal(iso: string): string {
+  return formatDate(iso);
 }
 
 export function TeamCard({ team, isAdmin, onDelete, onEdit }: TeamCardProps) {
@@ -35,8 +33,8 @@ export function TeamCard({ team, isAdmin, onDelete, onEdit }: TeamCardProps) {
     <>
       <div className="group relative rounded-2xl border border-ink-800 bg-ink-850/80 p-5 shadow-glow transition-all duration-300 hover:border-ball-500/40 hover:shadow-glow-strong">
         <div className="flex items-center justify-between mb-1">
-          <h3 className="text-base font-semibold text-ink-100 leading-tight">
-            {team.team_name}
+          <h3 className="text-base font-bold text-ink-100 leading-tight">
+            {team.team_name || teamDisplayName(team.pokemon, team.date_created)}
           </h3>
           {isAdmin && (
             <div className="flex items-center gap-1">
@@ -59,22 +57,17 @@ export function TeamCard({ team, isAdmin, onDelete, onEdit }: TeamCardProps) {
             </div>
           )}
         </div>
-        <time className="block text-xs font-medium uppercase tracking-wider text-ink-400 mb-4">
-          {formatDate(team.date_created)}
+        <time className="block text-xs font-medium text-ink-500 mb-4">
+          {formatDateLocal(team.date_created)}
         </time>
 
         <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 sm:gap-3 mb-5">
           {team.pokemon.map((p, i) => (
             <div key={i} className="flex flex-col items-center gap-1">
               <div className="w-20 h-20 flex items-center justify-center">
-                <img
-                  src={spriteUrl(p.species)}
-                  alt={p.species}
-                  loading="lazy"
+                <Sprite
+                  species={p.species}
                   className="w-20 h-20 object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]"
-                  onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).style.opacity = '0.2';
-                  }}
                 />
               </div>
               <span className="text-[11px] text-ink-300 text-center leading-tight line-clamp-2 min-h-[1.5em]">
@@ -119,7 +112,7 @@ export function TeamCard({ team, isAdmin, onDelete, onEdit }: TeamCardProps) {
               <div className="flex items-center gap-2">
                 <Code2 size={16} className="text-ball-400" />
                 <span className="text-sm font-semibold text-ink-100">Poképaste</span>
-                <span className="text-xs text-ink-500">{formatDate(team.date_created)}</span>
+                <span className="text-xs text-ink-500">{formatDateLocal(team.date_created)}</span>
               </div>
               <div className="flex items-center gap-1">
                 <button
