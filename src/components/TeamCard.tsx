@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { ExternalLink, Trash2, Pencil, Code2, X, Copy, Check } from 'lucide-react';
 import type { Team } from '../lib/types';
-import { Sprite } from './Sprite';
-import { teamDisplayName, hasCustomNickname, formatDate } from '../lib/pokepaste';
+import { teamDisplayName, hasCustomNickname, formatDate, spriteUrl } from '../lib/pokepaste';
 
 interface TeamCardProps {
   team: Team;
@@ -65,9 +64,14 @@ export function TeamCard({ team, isAdmin, onDelete, onEdit }: TeamCardProps) {
           {team.pokemon.map((p, i) => (
             <div key={i} className="flex flex-col items-center gap-1">
               <div className="w-20 h-20 flex items-center justify-center">
-                <Sprite
-                  species={p.species}
+                <img
+                  src={spriteUrl(p.species)}
+                  alt={p.species}
+                  loading="lazy"
                   className="w-20 h-20 object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).style.opacity = '0.2';
+                  }}
                 />
               </div>
               <span className="text-[11px] text-ink-300 text-center leading-tight line-clamp-2 min-h-[1.5em]">

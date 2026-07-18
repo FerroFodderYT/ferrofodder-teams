@@ -13,8 +13,7 @@ import {
   type Gen,
   type Team,
 } from '../lib/types';
-import { parsePokepaste } from '../lib/pokepaste';
-import { Sprite } from './Sprite';
+import { parsePokepaste, spriteUrl } from '../lib/pokepaste';
 
 interface AddTeamFormProps {
   initialGen: Gen;
@@ -56,8 +55,6 @@ export function AddTeamForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [folder, setFolder] = useState(team?.folder ?? '');
-
   const parsed = useMemo(() => parsePokepaste(pokepasteText), [pokepasteText]);
 
   const availableFormats = formatsForGen(gen);
@@ -95,7 +92,6 @@ export function AddTeamForm({
       pokepaste_text: pokepasteText,
       pokepaste_url: pokepasteUrl.trim() || null,
       pokemon: parsed,
-      folder: folder.trim() || null,
     };
     const result = isEditing
       ? await adminCall({ action: 'update', id: team!.id, ...payload })
@@ -190,19 +186,6 @@ export function AddTeamForm({
 
           <label className="flex flex-col gap-1.5">
             <span className="text-xs font-medium uppercase tracking-wider text-ink-400">
-              Folder <span className="text-ink-500 normal-case">(optional)</span>
-            </span>
-            <input
-              type="text"
-              value={folder}
-              onChange={(e) => setFolder(e.target.value)}
-              placeholder="Teams with the same folder name group together"
-              className="bg-ink-800 border border-ink-700 rounded-lg px-3 py-2 text-sm text-ink-100 placeholder-ink-500 focus:outline-none focus:border-ball-500"
-            />
-          </label>
-
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium uppercase tracking-wider text-ink-400">
               Team Name
             </span>
             <input
@@ -253,9 +236,13 @@ export function AddTeamForm({
               )}
               {parsed.map((p, i) => (
                 <div key={i} className="flex flex-col items-center gap-1">
-                  <Sprite
-                    species={p.species}
+                  <img
+                    src={spriteUrl(p.species)}
+                    alt={p.species}
                     className="w-16 h-16 object-contain"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).style.opacity = '0.2';
+                    }}
                   />
                   <span className="text-[10px] text-ink-400 text-center leading-tight line-clamp-2">
                     {p.species}

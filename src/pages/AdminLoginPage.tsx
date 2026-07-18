@@ -1,10 +1,21 @@
 import { useState } from 'react';
 import { Lock, ShieldCheck, Loader2, AlertCircle, KeyRound, ArrowLeft, Copy, Check } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { supabase } from '../lib/supabase';
 import { useAdmin } from '../lib/auth';
 import { useNavigate } from '../lib/router';
 
 type Step = 'credentials' | 'enroll-qr' | 'enroll-verify' | 'verify' | 'done';
+
+function extractSecret(otpauthUri: string): string {
+  try {
+    const url = new URL(otpauthUri);
+    return url.searchParams.get('secret') ?? otpauthUri;
+  } catch {
+    const match = otpauthUri.match(/[?&]secret=([^&]+)/);
+    return match ? decodeURIComponent(match[1]) : otpauthUri;
+  }
+}
 
 export function AdminLoginPage() {
   const { refresh } = useAdmin();
@@ -126,7 +137,7 @@ export function AdminLoginPage() {
 
   const copySecret = () => {
     if (!qrUrl) return;
-    navigator.clipboard.writeText(qrUrl).then(() => {
+    navigator.clipboard.writeText(extractSecret(qrUrl)).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     });
@@ -213,19 +224,32 @@ export function AdminLoginPage() {
                 </div>
 
                 {qrUrl && (
-                  <div className="flex flex-col items-center gap-3">
-                    <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrUrl)}`}
-                      alt="TOTP QR code"
-                      className="w-48 h-48 rounded-lg bg-white p-2"
-                    />
-                    <button
-                      onClick={copySecret}
-                      className="inline-flex items-center gap-1.5 text-xs text-ink-400 hover:text-ink-100"
-                    >
-                      {copied ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
-                      {copied ? 'Copied' : 'Copy secret URI'}
-                    </button>
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="rounded-xl bg-white p-3 shadow-lg">
+                      <QRCodeSVG
+                        value={qrUrl}
+                        size={200}
+                        bgColor="#ffffff"
+                        fgColor="#000000"
+                        level="M"
+                      />
+                    </div>
+                    <div className="w-full">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-500 mb-1.5">
+                        Can't scan? Enter this key manually:
+                      </p>
+                      <div className="flex items-center gap-2 bg-ink-800 border border-ink-700 rounded-lg px-3 py-2">
+                        <code className="flex-1 text-xs text-ink-200 break-all font-mono">
+                          {extractSecret(qrUrl)}
+                        </code>
+                        <button
+                          onClick={copySecret}
+                          className="shrink-0 inline-flex items-center gap-1 text-xs text-ink-400 hover:text-ink-100"
+                        >
+                          {copied ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
 

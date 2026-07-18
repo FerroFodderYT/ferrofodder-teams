@@ -15,7 +15,6 @@ import {
   type Team,
 } from '../lib/types';
 import { TeamCard } from '../components/TeamCard';
-import { FolderGroup } from '../components/FolderGroup';
 import { useAdmin, adminCall } from '../lib/auth';
 import { useVisibility } from '../lib/genVisibility';
 import { useNavigate } from '../lib/router';
@@ -146,40 +145,13 @@ export function SearchPage() {
   const hasFilters = query || selectedGens.length || selectedFormats.length || selectedArchetypes.length || dateFrom || dateTo;
 
   const renderGroup = (teams: Team[], genSlug: string, fmt: string) => {
-    const folderGroups = new Map<string, Team[]>();
-    const standalone: Team[] = [];
-    for (const t of teams) {
-      const folder = (t.folder ?? '').trim();
-      if (folder) {
-        if (!folderGroups.has(folder)) folderGroups.set(folder, []);
-        folderGroups.get(folder)!.push(t);
-      } else {
-        standalone.push(t);
-      }
-    }
-    const folderNames = Array.from(folderGroups.keys()).sort((a, b) => a.localeCompare(b));
-
     return (
-      <div className="space-y-4">
-        {folderNames.map((name) => (
-          <FolderGroup
-            key={name}
-            folderName={name}
-            teams={folderGroups.get(name)!}
-            isAdmin={isAdmin}
-            onDelete={handleDelete}
-            onEdit={(t) => navigate(`/${genSlug}/${t.format}/${t.archetype}`)}
-          />
-        ))}
-        {standalone.length > 0 && (
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-            {standalone.map((team) => (
-              <div key={team.id} className={deletingId === team.id ? 'opacity-40' : ''}>
-                <TeamCard team={team} isAdmin={isAdmin} onDelete={handleDelete} onEdit={(t) => navigate(`/${genSlug}/${t.format}/${t.archetype}`)} />
-              </div>
-            ))}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        {teams.map((team) => (
+          <div key={team.id} className={deletingId === team.id ? 'opacity-40' : ''}>
+            <TeamCard team={team} isAdmin={isAdmin} onDelete={handleDelete} onEdit={(t) => navigate(`/${genSlug}/${t.format}/${t.archetype}`)} />
           </div>
-        )}
+        ))}
       </div>
     );
   };

@@ -16,7 +16,6 @@ import {
   type Team,
 } from '../lib/types';
 import { TeamCard } from '../components/TeamCard';
-import { FolderGroup } from '../components/FolderGroup';
 import { AddTeamForm } from '../components/AddTeamForm';
 import { useNavigate } from '../lib/router';
 
@@ -36,19 +35,14 @@ export function TeamListPage({ gen, format, archetype }: TeamListPageProps) {
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const valid =
-    isGen(gen) && isFormat(format) && isArchetype(archetype);
+  const valid = isGen(gen) && isFormat(format) && isArchetype(archetype);
   const g = valid ? (gen as Gen) : 'gen9';
   const genNum = genNumberFromSlug(g);
   const fmt = valid ? (format as Format) : 'ou';
   const arch = valid ? (archetype as Archetype) : 'hyper-offense';
 
   const loadTeams = async () => {
-    if (!valid) {
-      setError('Invalid category.');
-      setLoading(false);
-      return;
-    }
+    if (!valid) { setError('Invalid category.'); setLoading(false); return; }
     setLoading(true);
     setError(null);
     const { data, error: err } = await supabase
@@ -58,7 +52,6 @@ export function TeamListPage({ gen, format, archetype }: TeamListPageProps) {
       .eq('format', fmt)
       .eq('archetype', arch)
       .order('date_created', { ascending: false });
-
     setLoading(false);
     if (err) { setError(err.message); return; }
     setTeams((data as Team[]) ?? []);
@@ -74,10 +67,7 @@ export function TeamListPage({ gen, format, archetype }: TeamListPageProps) {
     setDeletingId(team.id);
     const result = await adminCall({ action: 'delete', id: team.id });
     setDeletingId(null);
-    if (!result.ok) {
-      alert('Delete failed: ' + (result.error ?? 'Unknown error'));
-      return;
-    }
+    if (!result.ok) { alert('Delete failed: ' + (result.error ?? 'Unknown error')); return; }
     loadTeams();
   };
 
@@ -85,28 +75,12 @@ export function TeamListPage({ gen, format, archetype }: TeamListPageProps) {
     return (
       <div className="max-w-2xl mx-auto py-20 text-center animate-fade-in">
         <p className="text-ink-300">That category doesn't exist.</p>
-        <button
-          onClick={() => navigate('/')}
-          className="mt-4 px-4 py-2 rounded-lg text-sm font-medium text-ink-100 bg-ink-800 hover:bg-ink-750"
-        >
+        <button onClick={() => navigate('/')} className="mt-4 px-4 py-2 rounded-lg text-sm font-medium text-ink-100 bg-ink-800 hover:bg-ink-750">
           Back home
         </button>
       </div>
     );
   }
-
-  const folderGroups = new Map<string, Team[]>();
-  const standalone: Team[] = [];
-  for (const t of teams) {
-    const folder = (t.folder ?? '').trim();
-    if (folder) {
-      if (!folderGroups.has(folder)) folderGroups.set(folder, []);
-      folderGroups.get(folder)!.push(t);
-    } else {
-      standalone.push(t);
-    }
-  }
-  const folderNames = Array.from(folderGroups.keys()).sort((a, b) => a.localeCompare(b));
 
   return (
     <div className="animate-fade-in">
@@ -119,11 +93,8 @@ export function TeamListPage({ gen, format, archetype }: TeamListPageProps) {
             <span>/</span>
             <span>{archetypeLabel(arch)}</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-ink-100">
-            {archetypeLabel(arch)}
-          </h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-ink-100">{archetypeLabel(arch)}</h1>
         </div>
-
         {isAdmin && (
           <button
             onClick={() => setShowAdd(true)}
@@ -156,38 +127,12 @@ export function TeamListPage({ gen, format, archetype }: TeamListPageProps) {
           )}
         </div>
       ) : (
-        <div className="space-y-6">
-          {folderNames.length > 0 && (
-            <div className="space-y-4">
-              {folderNames.map((name) => (
-                <FolderGroup
-                  key={name}
-                  folderName={name}
-                  teams={folderGroups.get(name)!}
-                  isAdmin={isAdmin}
-                  onDelete={handleDelete}
-                  onEdit={setEditingTeam}
-                />
-              ))}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          {teams.map((team) => (
+            <div key={team.id} className={deletingId === team.id ? 'opacity-40' : ''}>
+              <TeamCard team={team} isAdmin={isAdmin} onDelete={handleDelete} onEdit={setEditingTeam} />
             </div>
-          )}
-
-          {standalone.length > 0 && (
-            <div>
-              {folderNames.length > 0 && (
-                <h2 className="text-xs font-semibold uppercase tracking-wider text-ink-500 mb-3">
-                  Standalone teams
-                </h2>
-              )}
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                {standalone.map((team) => (
-                  <div key={team.id} className={deletingId === team.id ? 'opacity-40' : ''}>
-                    <TeamCard team={team} isAdmin={isAdmin} onDelete={handleDelete} onEdit={setEditingTeam} />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          ))}
         </div>
       )}
 
@@ -197,13 +142,9 @@ export function TeamListPage({ gen, format, archetype }: TeamListPageProps) {
           initialFormat={fmt}
           initialArchetype={arch}
           onClose={() => setShowAdd(false)}
-          onSaved={() => {
-            setShowAdd(false);
-            loadTeams();
-          }}
+          onSaved={() => { setShowAdd(false); loadTeams(); }}
         />
       )}
-
       {editingTeam && (
         <AddTeamForm
           initialGen={g}
@@ -211,10 +152,7 @@ export function TeamListPage({ gen, format, archetype }: TeamListPageProps) {
           initialArchetype={arch}
           team={editingTeam}
           onClose={() => setEditingTeam(null)}
-          onSaved={() => {
-            setEditingTeam(null);
-            loadTeams();
-          }}
+          onSaved={() => { setEditingTeam(null); loadTeams(); }}
         />
       )}
     </div>
