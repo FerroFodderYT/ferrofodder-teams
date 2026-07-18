@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, Loader2, Inbox, FolderPlus, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { useAdmin, adminCall } from '../lib/auth';
+import { useAdmin } from '../lib/auth';
 import {
   archetypeLabel,
   formatLabel,
@@ -88,10 +88,10 @@ export function TeamListPage({ gen, format, archetype }: TeamListPageProps) {
   const handleDelete = async (team: Team) => {
     if (!confirm('Delete this team? This cannot be undone.')) return;
     setDeletingId(team.id);
-    const result = await adminCall({ action: 'delete', id: team.id });
+    const { error } = await supabase.from('teams').delete().eq('id', team.id);
     setDeletingId(null);
-    if (!result.ok) {
-      alert('Delete failed: ' + (result.error ?? 'Unknown error'));
+    if (error) {
+      alert('Delete failed: ' + error.message);
       return;
     }
     loadTeams();
@@ -100,15 +100,14 @@ export function TeamListPage({ gen, format, archetype }: TeamListPageProps) {
   const handleCreateFolder = async () => {
     if (!newFolderName.trim()) return;
     setCreatingFolder(true);
-    const res = await adminCall({
-      action: 'createFolder',
+    const { error } = await supabase.from('folders').insert({
       gen: genNum,
       format: fmt,
       archetype: arch,
       name: newFolderName.trim(),
     });
     setCreatingFolder(false);
-    if (!res.ok) { alert('Failed to create folder: ' + res.error); return; }
+    if (error) { alert('Failed to create folder: ' + error.message); return; }
     setNewFolderName('');
     setShowCreateFolder(false);
     loadTeams();

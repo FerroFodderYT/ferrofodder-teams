@@ -1,6 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import { supabase } from './supabase';
-import { adminCall } from './auth';
 import type { GenVisibility, Format } from './types';
 
 interface FormatVisibilityRow {
@@ -76,9 +75,12 @@ export function VisibilityProvider({ children }: { children: ReactNode }) {
   }, [fetchVisibility]);
 
   const toggleGenVisibility = useCallback(async (gen: number, visible: boolean) => {
-    const result = await adminCall({ action: 'toggleGenVisibility', gen, visible });
-    if (!result.ok) {
-      throw new Error(result.error ?? 'Failed to update gen visibility');
+    const { error } = await supabase
+      .from('gen_visibility')
+      .update({ visible, updated_at: new Date().toISOString() })
+      .eq('gen', gen);
+    if (error) {
+      throw new Error(error.message);
     }
     setGenVisibility((prev) => {
       const next = new Map(prev);
@@ -88,9 +90,13 @@ export function VisibilityProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const toggleFormatVisibility = useCallback(async (gen: number, format: string, visible: boolean) => {
-    const result = await adminCall({ action: 'toggleFormatVisibility', gen, format, visible });
-    if (!result.ok) {
-      throw new Error(result.error ?? 'Failed to update format visibility');
+    const { error } = await supabase
+      .from('format_visibility')
+      .update({ visible, updated_at: new Date().toISOString() })
+      .eq('gen', gen)
+      .eq('format', format);
+    if (error) {
+      throw new Error(error.message);
     }
     const key = formatKey(gen, format);
     setFormatVisibility((prev) => {

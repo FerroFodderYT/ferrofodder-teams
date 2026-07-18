@@ -1,15 +1,24 @@
 import { useState } from 'react';
-import { AdminProvider } from './lib/auth';
+import { AdminProvider, useAdmin } from './lib/auth';
 import { VisibilityProvider } from './lib/genVisibility';
 import { useRoute, parseRoute, useNavigate } from './lib/router';
 import { Sidebar, MobileMenuButton, YouTubeLink } from './components/Sidebar';
-import { VerifyButton } from './components/VerifyModal';
 import { HomePage } from './pages/HomePage';
 import { TeamListPage } from './pages/TeamListPage';
 import { SearchPage } from './pages/SearchPage';
+import { AdminLoginPage } from './pages/AdminLoginPage';
+import { AdminSignupPage } from './pages/AdminSignupPage';
+import { LogOut } from 'lucide-react';
 
 function Header({ onOpenMobile }: { onOpenMobile: () => void }) {
   const navigate = useNavigate();
+  const { isAdmin, signOut } = useAdmin();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/');
+  };
+
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between gap-3 px-4 sm:px-6 h-14 border-b border-ink-800 bg-ink-950/80 backdrop-blur">
       <div className="flex items-center gap-2">
@@ -25,7 +34,16 @@ function Header({ onOpenMobile }: { onOpenMobile: () => void }) {
       </div>
       <div className="flex items-center gap-2">
         <YouTubeLink />
-        <VerifyButton />
+        {isAdmin && (
+          <button
+            onClick={handleSignOut}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-ink-300 hover:text-ball-300 hover:bg-ink-800 transition-colors"
+            title="Sign out"
+          >
+            <LogOut size={15} />
+            <span className="hidden sm:inline">Sign out</span>
+          </button>
+        )}
       </div>
     </header>
   );
@@ -35,6 +53,13 @@ function Shell() {
   const path = useRoute();
   const route = parseRoute(path);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  if (route.name === 'admin-login') {
+    return <AdminLoginPage />;
+  }
+  if (route.name === 'admin-signup') {
+    return <AdminSignupPage />;
+  }
 
   return (
     <div className="min-h-screen flex bg-ink-950">

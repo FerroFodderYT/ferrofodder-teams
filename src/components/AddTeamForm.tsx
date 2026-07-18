@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { X, Loader2, AlertCircle, FolderPlus } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { adminCall } from '../lib/auth';
 import {
   ARCHETYPES,
   GENS,
@@ -108,19 +107,22 @@ export function AddTeamForm({
     let finalFolderId = folderId;
 
     if (newFolderName.trim()) {
-      const folderResult = await adminCall({
-        action: 'createFolder',
-        gen: genNum,
-        format,
-        archetype,
-        name: newFolderName.trim(),
-      });
-      if (!folderResult.ok) {
+      const { data: folderData, error: folderError } = await supabase
+        .from('folders')
+        .insert({
+          gen: genNum,
+          format,
+          archetype,
+          name: newFolderName.trim(),
+        })
+        .select('id')
+        .single();
+      if (folderError) {
         setSubmitting(false);
-        setError(folderResult.error ?? 'Failed to create folder.');
+        setError(folderError.message);
         return;
       }
-      finalFolderId = (folderResult.data as { id: string }).id;
+      finalFolderId = folderData.id;
     }
 
     const payload = {
@@ -134,12 +136,16 @@ export function AddTeamForm({
       pokemon: parsed,
       folder_id: finalFolderId || null,
     };
-    const result = isEditing
-      ? await adminCall({ action: 'update', id: team!.id, ...payload })
-      : await adminCall({ action: 'insert', ...payload });
+
+    let result;
+    if (isEditing) {
+      result = await supabase.from('teams').update(payload).eq('id', team!.id).select('id').single();
+    } else {
+      result = await supabase.from('teams').insert(payload).select('id').single();
+    }
     setSubmitting(false);
-    if (!result.ok) {
-      setError(result.error ?? 'Failed to save team.');
+    if (result.error) {
+      setError(result.error.message);
       return;
     }
     onSaved();

@@ -3,7 +3,7 @@ import { ChevronDown, FolderOpen, Trash2, Star, Pencil, X, Check, Loader2 } from
 import type { Folder, Team } from '../lib/types';
 import { TeamCard } from './TeamCard';
 import { spriteUrl } from '../lib/pokepaste';
-import { adminCall } from '../lib/auth';
+import { supabase } from '../lib/supabase';
 
 interface FolderCardProps {
   folder: Folder;
@@ -33,9 +33,9 @@ export function FolderCard({ folder, teams, isAdmin, onTeamsChanged, onFolderCha
       return;
     }
     setBusy(true);
-    const res = await adminCall({ action: 'updateFolder', id: folder.id, name: nameDraft.trim() });
+    const { error } = await supabase.from('folders').update({ name: nameDraft.trim() }).eq('id', folder.id);
     setBusy(false);
-    if (!res.ok) { alert('Failed to rename folder: ' + res.error); return; }
+    if (error) { alert('Failed to rename folder: ' + error.message); return; }
     setEditingName(false);
     onFolderChanged();
   };
@@ -43,27 +43,27 @@ export function FolderCard({ folder, teams, isAdmin, onTeamsChanged, onFolderCha
   const deleteFolder = async () => {
     if (!confirm(`Delete folder "${folder.name}"? Teams inside will be kept as standalone.`)) return;
     setBusy(true);
-    const res = await adminCall({ action: 'deleteFolder', id: folder.id });
+    const { error } = await supabase.from('folders').delete().eq('id', folder.id);
     setBusy(false);
-    if (!res.ok) { alert('Failed to delete folder: ' + res.error); return; }
+    if (error) { alert('Failed to delete folder: ' + error.message); return; }
     onFolderChanged();
     onTeamsChanged();
   };
 
   const setPreview = async (teamId: string) => {
     setSettingPreviewId(teamId);
-    const res = await adminCall({ action: 'updateFolder', id: folder.id, preview_team_id: teamId });
+    const { error } = await supabase.from('folders').update({ preview_team_id: teamId }).eq('id', folder.id);
     setSettingPreviewId(null);
-    if (!res.ok) { alert('Failed to set preview: ' + res.error); return; }
+    if (error) { alert('Failed to set preview: ' + error.message); return; }
     onFolderChanged();
   };
 
   const handleDeleteTeam = async (team: Team) => {
     if (!confirm('Delete this team? This cannot be undone.')) return;
     setDeletingId(team.id);
-    const res = await adminCall({ action: 'delete', id: team.id });
+    const { error } = await supabase.from('teams').delete().eq('id', team.id);
     setDeletingId(null);
-    if (!res.ok) { alert('Delete failed: ' + res.error); return; }
+    if (error) { alert('Delete failed: ' + error.message); return; }
     onTeamsChanged();
   };
 

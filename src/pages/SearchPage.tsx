@@ -15,7 +15,6 @@ import { TeamCard } from '../components/TeamCard';
 import { useAdmin } from '../lib/auth';
 import { useVisibility } from '../lib/genVisibility';
 import { useNavigate } from '../lib/router';
-import { adminCall } from '../lib/auth';
 
 const DATE_PRESETS = [
   { label: 'All time', value: 'all' as const },
@@ -113,9 +112,9 @@ export function SearchPage() {
   const handleDelete = async (team: Team) => {
     if (!confirm('Delete this team? This cannot be undone.')) return;
     setDeletingId(team.id);
-    const res = await adminCall({ action: 'delete', id: team.id });
+    const { error } = await supabase.from('teams').delete().eq('id', team.id);
     setDeletingId(null);
-    if (!res.ok) { alert('Delete failed: ' + res.error); return; }
+    if (error) { alert('Delete failed: ' + error.message); return; }
     setResults((prev) => prev.filter((t) => t.id !== team.id));
   };
 
